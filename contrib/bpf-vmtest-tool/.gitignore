@@ -1,0 +1,23 @@
+.gitignore_local
+.python-version
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Unit test / coverage reports
+.pytest_cache/
+
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Ruff stuff:
+.ruff_cache/

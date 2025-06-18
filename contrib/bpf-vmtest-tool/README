@@ -1,0 +1,78 @@
+This directory contains a Python script to run BPF programs or shell commands
+under a live Linux kernel using QEMU virtual machines.
+
+USAGE
+=====
+
+To run a shell command inside a live kernel VM:
+
+    python main.py -k 6.15 -r / -c "uname -a"
+
+To run a BPF source file in the VM:
+
+    python main.py -k 6.15  --bpf-src fail.c
+
+To run a precompiled BPF object file:
+
+    python main.py -k 6.15 --bpf-obj fail.bpf.o
+
+The tool will download and build the specified kernel version from:
+
+    https://www.kernel.org/pub/linux/kernel
+
+A prebuilt `bzImage` can be supplied using the `--kernel-image` flag.
+
+NOTE
+====
+- Only x86_64 is supported
+- Only "/" (the root filesystem) is currently supported as the VM rootfs when
+running or testing BPF programs using `--bpf-src` or `--bpf-obj`.
+
+DEPENDENCIES
+============
+
+- Python >= 3.9
+- vmtest >= v0.18.0 (https://github.com/danobi/vmtest)
+    - QEMU
+    - qemu-guest-agent
+
+For compiling kernel
+- https://docs.kernel.org/process/changes.html#current-minimal-requirements
+For compiling and loading BPF programs:
+
+- libbpf
+- bpftool
+- gcc-bpf-unknown-none
+	(https://gcc.gnu.org/wiki/BPFBackEnd#Where_to_find_GCC_BPF)
+- vmlinux.h
+    Can be generated using:
+
+    bpftool btf dump file /sys/kernel/btf/vmlinux format c > \
+    /usr/local/include/vmlinux.h
+
+    Or downloaded from https://github.com/libbpf/vmlinux.h/tree/main
+
+BUILD FLAGS
+===========
+You can customize compiler settings using environment variables:
+
+- BPF_CC:       Compiler for the BPF program (default: bpf-unknown-none-gcc)
+- BPF_CFLAGS:   Extra flags for BPF program compilation (default: "-O2")
+- BPF_INCLUDES: Include paths for BPF (default: -I/usr/local/include -I/usr/include)
+- CC:           Compiler for the user-space loader (default: gcc)
+- CFLAGS:       Flags for compiling the loader (default: -g -Wall)
+- LDFLAGS:      Linker flags for the loader (default: -lelf -lz -lbpf)
+
+Example usage:
+
+    BPF_CFLAGS="-O3 -g" CFLAGS="-O2" python main.py -k 6.15  --bpf-src fail.c
+
+DEVELOPMENT
+===========
+
+Development dependencies are specified in `pyproject.toml`, which can be used
+with any suitable Python virtual environment manager.
+
+To run the test suite:
+
+    python3 -m pytest
