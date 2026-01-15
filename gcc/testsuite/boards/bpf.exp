@@ -1,0 +1,123 @@
+load_lib "standard.exp"
+set_board_info target_install {bpf-unknown-none}
+set_board_info generic_name bpf
+set_board_info mathlib ""
+unset_board_info isremote
+set_board_info isremote "0"
+
+
+if {![info exists KERNEL_VERSION]} {
+    set KERNEL_VERSION 6.15
+    verbose -log "Using default kernel version: $KERNEL_VERSION" 1
+}
+
+if {![info exists LOG_LEVEL]} {
+    set LOG_LEVEL ERROR
+    verbose -log "Using default log level: $LOG_LEVEL" 1
+}
+
+proc bpf_compile {source destfile type options} {
+
+    if { $type == "executable" } {
+        return [bpf_target_compile $source $destfile $type $options]
+    }
+    return [default_target_compile $source $destfile $type $options]
+}
+
+proc bpf_target_compile {source destfile type options} {
+
+    global srcdir
+    global KERNEL_VERSION
+    global LOG_LEVEL
+    set python3 [find_python3]
+    if {$python3 == ""} {
+        error "Cannot find python3 in $PATH"
+    }
+    set script_path "$srcdir/../../contrib/bpf-vmtest-tool/main.py"
+    set opts ""
+    foreach i $options {
+        if {[regexp "^compiler=" $i]} {
+            regsub "^compiler=" $i "" tmp
+            if { $tmp eq "" } {
+                return "bpf_target_compile: No compiler to compile with"
+            }
+            set compiler [ lindex [split $tmp " "] 0 ]
+            set compiler_flags [ lindex [split $tmp " "] 1 ]
+            append opts " $compiler_flags"
+        }
+
+        if {[regexp "^additional_flags=" $i]} {
+            regsub "^additional_flags=" $i "" tmp
+            set tmp [string trim $tmp]
+            append opts " $tmp"
+        }
+    }
+
+    set opts [string trim $opts]
+    
+    setenv BPF_CFLAGS $opts
+    setenv BPF_CC $compiler
+    set args [list $script_path --log-level $LOG_LEVEL bpf compile $source -k $KERNEL_VERSION -o $destfile ]
+    set status [remote_exec host $python3 $args]
+    set exit_code [lindex $status 0]
+    set output [lindex $status 1]
+    unsetenv BPF_CFLAGS
+    unsetenv BPF_CC
+
+    if { $exit_code < 0 } {
+        verbose -log "Couldn't compile $source: $output"
+        return $output
+    }
+
+    verbose -log "Executed $source, exit_code $exit_code"
+    if {$output ne ""} {
+        verbose -log -- $output 2
+    }
+
+    return $output
+}
+
+proc bpf_load {dest prog args} {
+    global srcdir
+    global KERNEL_VERSION
+    global LOG_LEVEL
+    # Construct command
+    set python3 [find_python3]
+    if {$python3 == ""} {
+        error "Cannot find python3 in $PATH"
+    }
+    set script_path "$srcdir/../../contrib/bpf-vmtest-tool/main.py"
+    set bpf_object $prog
+
+    set args [list $script_path --log-level $LOG_LEVEL vmtest -k $KERNEL_VERSION --bpf-obj $prog ]
+    set status [remote_exec $dest $python3 $args]
+    set exit_code [lindex $status 0]
+    set output [lindex $status 1]
+
+    if { $exit_code < 0 } {
+        verbose -log "Couldn't execute $prog: $output"
+        return "unresolved"
+    }
+
+    verbose -log "Executed $prog, exit_code $exit_code"
+    if {$output ne ""} {
+        verbose -log -- $output 2
+    }
+
+    if { $exit_code == 0 } {
+        return [list "pass" $output]
+    } else {
+        return [list "fail" $output]
+    }
+}
+
+
+proc find_python3 {} {
+    foreach candidate {python3 python} {
+        set path [which $candidate]
+        if {$path != ""} {
+            return $path
+        }
+    }
+    return ""
+}

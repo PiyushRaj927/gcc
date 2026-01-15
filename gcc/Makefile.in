@@ -4653,6 +4653,7 @@ site.exp: ./config.status Makefile
 	fi
 	echo "set tmpdir $(objdir)/testsuite" >> ./site.tmp
 	@echo "set srcdir \"\$${srcdir}/testsuite\"" >> ./site.tmp
+	@echo "lappend boards_dir \"\$${srcdir}/boards\"" >> ./site.tmp
 	@if [ "X$(ALT_CC_UNDER_TEST)" != "X" ] ; then \
 	  echo "set ALT_CC_UNDER_TEST \"$(ALT_CC_UNDER_TEST)\"" >> ./site.tmp; \
 	else true; \
